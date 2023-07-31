@@ -1,69 +1,74 @@
+import { fetchBreeds, fetchCatByBreed } from './cat-api.js';
+import Notiflix from 'notiflix';
 import SlimSelect from 'slim-select';
-import 'slim-select/dist/slimselect.css';
-import { Notify } from 'notiflix/build/notiflix-notify-aio';
-import { fetchBreeds, fetchCatByBreed } from './js/cat-api';
-import { refs } from './js/refs';
 
-function createCatList() {
-  // Показываем лоадер перед началом запроса
-  refs.loader.classList.remove('is-hidden');
-  refs.selectCat.classList.add('is-hidden');
-  refs.error.classList.add('is-hidden');
+// const loaderEl = document.querySelector('.loader');
+// const errorEl = document.querySelector('.error');
+const catInfoEl = document.querySelector('.cat-info');
+const selectEl = document.querySelector('.breed-select');
 
-  //обрабатываем результат запроса на бэкенд (все породы кошек)
-  fetchBreeds()
-    .then(data => {
-      const optionsList = data
-        .map(({ id, name }) => ` <option value="${id}">${name}</option>`)
-        .join(' ');
+selectEl.addEventListener('change', onBreedSelect);
 
-      refs.selectCat.innerHTML = optionsList;
+function onBreedSelect(event) {
+  Notiflix.Loading.standard('Loading data, please wait...');
+  catInfoEl.innerHTML = '';
 
-      //стилизуем селект из дополнительной библиотеки SlimSelect
+  const breedPr = fetchCatByBreed(event.target.value);
 
-      new SlimSelect({
-        select: refs.selectCat,
-      });
-
-      // Если получили данные успешно, прячем лоадер показываем селект
-
-      refs.loader.classList.add('is-hidden');
-      refs.selectCat.classList.remove('is-hidden');
+  breedPr
+    .then(breed => {
+      createMarkupCard(breed[0]);
+      Notiflix.Loading.remove();
     })
     .catch(error => {
-      Notify.failure('Oops! Something went wrong! Try reloading the page!');
+      Notiflix.Loading.remove();
+      Notiflix.Notify.failure(
+        'Oops! Something went wrong! Try reloading the page!'
+      );
     });
 }
 
-function onSelectChange(evt) {
-  refs.loader.classList.remove('is-hidden');
-  refs.selectCat.classList.add('is-hidden');
-
-  const selectedBreedId = evt.currentTarget.value;
-
-  fetchCatByBreed(selectedBreedId)
-    .then(data => {
-      renderMarkupInfo(data);
-      refs.loader.classList.add('is-hidden');
-      refs.catInfo.classList.remove('is-hidden');
+function createMarkupSelect(breeds) {
+  const markupSelect = breeds
+    .map(breed => {
+      return `<option value="${breed.id}">${breed.name}</option>`;
     })
-    .catch(error => {
-      refs.loader.classList.add('is-hidden');
-      Notify.failure('Oops! Something went wrong! Try reloading the page!');
-    });
+    .join();
+
+  selectEl.innerHTML = markupSelect;
+
+  selectEl.style.visibility = 'inherit';
+  new SlimSelect({
+    select: '.breed-select',
+  });
 }
 
-function renderMarkupInfo(data) {
-  const { breeds, url } = data[0];
-  const { name, temperament, description } = breeds[0];
-  const beerdCard = `<img class="pfoto-cat" width = "300px" src="${url}" alt="${name}">
-    <div class="text-part">
-  <h2 class="name-cat">${name}</h2>
-  <p class="deskr-cat">${description}</p>
-  <p class="temperament-cat"><span class="temperament-label">Temperament:</span> ${temperament}</p>  </div>`;
+function createMarkupCard(breed) {
+  const { url, breeds } = breed;
+  const { name, description, temperament } = breeds[0];
 
-  refs.catInfo.innerHTML = beerdCard;
+  const markupSelect = `
+  <h1>${name}</h1>
+  <p>${description}</p>
+  <p><strong>Temperament: </strong>${temperament}</p>
+  <img src=${url}>`;
+
+  catInfoEl.innerHTML = markupSelect;
 }
 
-createCatList();
-refs.selectCat.addEventListener('change', onSelectChange);
+Notiflix.Loading.standard('Loading data, please wait...');
+
+const breedsPr = fetchBreeds();
+
+breedsPr
+  .then(breeds => {
+    createMarkupSelect(breeds);
+
+    Notiflix.Loading.remove();
+  })
+  .catch(() => {
+    Notiflix.Loading.remove();
+    Notiflix.Notify.failure(
+      'Oops! Something went wrong! Try reloading the page!'
+    );
+  });
