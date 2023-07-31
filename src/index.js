@@ -1,84 +1,69 @@
-import { fetchBreeds } from './cat-api';
-import { fetchCatByBreed } from './cat-api';
-import Notiflix from 'notiflix';
 import SlimSelect from 'slim-select';
 import 'slim-select/dist/slimselect.css';
+import { Notify } from 'notiflix/build/notiflix-notify-aio';
+import { fetchBreeds, fetchCatByBreed } from './js/cat-api';
+import { refs } from './js/refs';
 
-const refs = {
-  select: document.querySelector('.breed-select'),
-  loader: document.querySelector('.loader'),
-  error: document.querySelector('.error'),
-  container: document.querySelector('.cat-info'),
-};
+function createCatList() {
+  // Показываем лоадер перед началом запроса
+  refs.loader.classList.remove('is-hidden');
+  refs.selectCat.classList.add('is-hidden');
+  refs.error.classList.add('is-hidden');
 
-refs.select.addEventListener('change', handlerClick);
-
-function handlerClick(evt) {
-  const breeds = evt.target.value;
-  refs.loader.hidden = false;
-  refs.select.hidden = true;
-  refs.container.hidden = true;
-
-  fetchCatByBreed(breeds)
-    .then(data => {
-      refs.container.innerHTML = createMarkup(data);
-    })
-    .catch(error => {
-      Notiflix.Report.failure(
-        'Oops!',
-        'Something went wrong! Try reloading the page!',
-        'Ok'
-      );
-    })
-    .finally(() => {
-      refs.loader.hidden = true;
-      refs.select.hidden = false;
-      refs.container.hidden = false;
-    });
-}
-
-function createOptions() {
-  refs.select.hidden = true;
+  //обрабатываем результат запроса на бэкенд (все породы кошек)
   fetchBreeds()
     .then(data => {
-      refs.select.innerHTML = data
-        .map(
-          el => `
-<option value="${el.id}">${el.name}</option>
-`
-        )
-        .join('');
+      const optionsList = data
+        .map(({ id, name }) => ` <option value="${id}">${name}</option>`)
+        .join(' ');
+
+      refs.selectCat.innerHTML = optionsList;
+
+      //стилизуем селект из дополнительной библиотеки SlimSelect
+
       new SlimSelect({
-        select: '#selectCat',
-        settings: {
-          placeholderText: 'Select Cat',
-        },
+        select: refs.selectCat,
       });
+
+      // Если получили данные успешно, прячем лоадер показываем селект
+
+      refs.loader.classList.add('is-hidden');
+      refs.selectCat.classList.remove('is-hidden');
     })
     .catch(error => {
-      Notiflix.Report.failure(
-        'Oops!',
-        'Something went wrong! Try reloading the page!',
-        'Ok'
-      );
-    })
-    .finally(() => {
-      refs.error.hidden = true;
-      refs.loader.hidden = true;
-      refs.select.hidden = false;
+      Notify.failure('Oops! Something went wrong! Try reloading the page!');
     });
 }
-createOptions();
 
-function createMarkup(array) {
-  return array
-    .map(({ url, breeds: [{ description, name, temperament }] }) => {
-      return `<img src="${url}" alt="${name}" width="400"/>
-    <h2>${name}</h2>
-    <h3>Description</h3>
-    <p class="descr">${description}</p>
-    <h3>Temperament</h3>
-    <p class="temperament">${temperament}</p>`;
+function onSelectChange(evt) {
+  refs.loader.classList.remove('is-hidden');
+  refs.selectCat.classList.add('is-hidden');
+
+  const selectedBreedId = evt.currentTarget.value;
+
+  fetchCatByBreed(selectedBreedId)
+    .then(data => {
+      renderMarkupInfo(data);
+      refs.loader.classList.add('is-hidden');
+      refs.catInfo.classList.remove('is-hidden');
     })
-    .join('');
+    .catch(error => {
+      refs.loader.classList.add('is-hidden');
+      Notify.failure('Oops! Something went wrong! Try reloading the page!');
+    });
 }
+
+function renderMarkupInfo(data) {
+  const { breeds, url } = data[0];
+  const { name, temperament, description } = breeds[0];
+  const beerdCard = `<img class="pfoto-cat" width = "300px" src="${url}" alt="${name}">
+    <div class="text-part">
+  <h2 class="name-cat">${name}</h2>
+  <p class="deskr-cat">${description}</p>
+  <p class="temperament-cat"><span class="temperament-label">Temperament:</span> ${temperament}</p>  </div>`;
+
+  refs.catInfo.innerHTML = beerdCard;
+}
+
+createCatList();
+refs.selectCat.addEventListener('change', onSelectChange);
